@@ -13,6 +13,26 @@ import warnings
 import string
 warnings.filterwarnings('ignore')
 
+
+
+def extract_emails(value):
+    if pd.isnull(value):
+        return None
+    # Split using comma or semicolon with optional whitespace
+    raw_emails = re.split(r'\s*[,;]\s*', value)
+    # Strip whitespace from each email and filter out empty strings
+    emails = [email.strip() for email in raw_emails if email.strip()]
+    return emails
+
+def preprocess_df(df):
+
+    df["clean_name"] = df["first_name"] + " " + df["last_name"]
+    df["list_mails"] = df["email_address"].apply(extract_emails)
+
+    # filter out the null companys, building control emails,
+    
+    return df
+
 def preprocess_text(text):
     """Preprocess text similar to the original code"""
     if pd.isnull(text):
@@ -97,7 +117,7 @@ def find_company_matches(df):
     print("Step 1: Finding similar companies...")
     
     # Preprocess company names
-    df['cleaned_company_name'] = df['company_name'].apply(preprocess_text)
+    df['cleaned_company_name'] = df['customer_name'].apply(preprocess_text)
     
     # Generate phonetic codes for blocking
     df['phonetic_code'] = df['cleaned_company_name'].apply(double_metaphone)
@@ -232,7 +252,7 @@ def find_secondary_matches(df):
     print("Step 3: Finding secondary matches (email/phone matches within primary groups)...")
     
     # Normalize phone numbers
-    df['normalized_phnumber'] = df['phnumber'].apply(standardize_phone_number)
+    df['normalized_phnumber'] = df['direct_phone'].apply(standardize_phone_number)
     
     secondary_group_mapping = {}
     secondary_group_counter = 0
@@ -302,8 +322,8 @@ def create_match_summary(df):
     print("Step 4: Creating match summary...")
     
     # Add customer_id column if it doesn't exist (using index)
-    if 'customer_id' not in df.columns:
-        df['customer_id'] = df.index
+    if 'S_id' not in df.columns:
+        df['S_id'] = df.index
     
     # Count matches for each level
     company_counts = df.groupby('company_group_id').size()
@@ -329,11 +349,11 @@ def create_match_summary(df):
     print("Creating matching ID lists...")
     
     # Primary matching IDs - list of customer IDs in the same primary group
-    primary_group_to_ids = df.groupby('primary_group_id')['customer_id'].apply(list).to_dict()
+    primary_group_to_ids = df.groupby('primary_group_id')['S_id'].apply(list).to_dict()
     df['matching_names_ids'] = df['primary_group_id'].map(primary_group_to_ids)
     
     # Secondary matching IDs - list of customer IDs in the same secondary group
-    secondary_group_to_ids = df.groupby('secondary_group_id')['customer_id'].apply(list).to_dict()
+    secondary_group_to_ids = df.groupby('secondary_group_id')['S_id'].apply(list).to_dict()
     df['secondary_matching_ids'] = df['secondary_group_id'].map(secondary_group_to_ids)
     
     return df
@@ -343,7 +363,7 @@ def main_matching_pipeline(df):
     print("Starting three-layer customer matching pipeline...")
     
     # Ensure required columns exist
-    required_columns = ['clean_name', 'company_name', 'phnumber', 'list_mails']
+    required_columns = ['first_name', 'last_name', 'customer_name', 'direct_phone', 'email_address']
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         raise ValueError(f"Missing required columns: {missing_columns}")
